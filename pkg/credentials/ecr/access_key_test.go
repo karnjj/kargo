@@ -25,9 +25,10 @@ func TestAccessKeyProvider_Supports(t *testing.T) {
 	const (
 		fakeRepoURL = "123456789012.dkr.ecr.us-west-2.amazonaws.com/my-repo"
 
-		fakeRegion = "us-west-2"
-		fakeID     = "AKIAIOSFODNN7EXAMPLE"                     // nolint:gosec
-		fakeSecret = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" // nolint:gosec
+		fakeRegion       = "us-west-2"
+		fakeID           = "AKIAIOSFODNN7EXAMPLE"                     // nolint:gosec
+		fakeSecret       = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" // nolint:gosec
+		fakeSessionToken = "IQoJb3JpZ2luX2VjEOr..."                   // nolint:gosec
 	)
 
 	testCases := []struct {
@@ -45,6 +46,18 @@ func TestAccessKeyProvider_Supports(t *testing.T) {
 				regionKey: []byte(fakeRegion),
 				idKey:     []byte(fakeID),
 				secretKey: []byte(fakeSecret),
+			},
+			expected: true,
+		},
+		{
+			name:     "valid image credentials with session token",
+			credType: credentials.TypeImage,
+			repoURL:  fakeRepoURL,
+			data: map[string][]byte{
+				regionKey:       []byte(fakeRegion),
+				idKey:           []byte(fakeID),
+				secretKey:       []byte(fakeSecret),
+				sessionTokenKey: []byte(fakeSessionToken),
 			},
 			expected: true,
 		},
@@ -155,6 +168,7 @@ func TestAccessKeyProvider_GetCredentials(t *testing.T) {
 		fakeRegion  = "us-west-2"
 		fakeID      = "AKIAIOSFODNN7EXAMPLE"                     // nolint:gosec
 		fakeSecret  = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" // nolint:gosec
+		fakeSessTok = "IQoJb3JpZ2luX2VjEOr..."                   // nolint:gosec
 		// base64 of "AWS:password"
 		fakeToken = "QVdTOnBhc3N3b3Jk" // nolint:gosec
 	)
@@ -169,6 +183,7 @@ func TestAccessKeyProvider_GetCredentials(t *testing.T) {
 			region string,
 			accessKeyID string,
 			secretAccessKey string,
+			sessionToken string,
 		) (string, time.Time, error)
 		setupCache func(cache *cache.Cache)
 		assertions func(t *testing.T, c *cache.Cache, creds *credentials.Credentials, err error)
@@ -180,6 +195,7 @@ func TestAccessKeyProvider_GetCredentials(t *testing.T) {
 			data:     map[string][]byte{},
 			getAuthTokenFn: func(
 				context.Context,
+				string,
 				string,
 				string,
 				string,
@@ -215,6 +231,75 @@ func TestAccessKeyProvider_GetCredentials(t *testing.T) {
 			},
 		},
 		{
+			name:     "cache hit with session token",
+			credType: credentials.TypeImage,
+			repoURL:  fakeRepoURL,
+			data: map[string][]byte{
+				regionKey:       []byte(fakeRegion),
+				idKey:           []byte(fakeID),
+				secretKey:       []byte(fakeSecret),
+				sessionTokenKey: []byte(fakeSessTok),
+			},
+			setupCache: func(c *cache.Cache) {
+				c.Set(
+					tokenCacheKey(fakeRegion, fakeID, fakeSecret, fakeSessTok),
+					fakeToken,
+					cache.DefaultExpiration,
+				)
+			},
+			getAuthTokenFn: func(
+				context.Context,
+				string,
+				string,
+				string,
+				string,
+			) (string, time.Time, error) {
+				require.Fail(t, "getAuthTokenFn should not run on cache hit")
+				return "", time.Time{}, nil
+			},
+			assertions: func(t *testing.T, _ *cache.Cache, creds *credentials.Credentials, err error) {
+				assert.NoError(t, err)
+				assert.NotNil(t, creds)
+				assert.Equal(t, "AWS", creds.Username)
+				assert.Equal(t, "password", creds.Password)
+			},
+		},
+		{
+			name:     "session token not in cache is a miss",
+			credType: credentials.TypeImage,
+			repoURL:  fakeRepoURL,
+			data: map[string][]byte{
+				regionKey:       []byte(fakeRegion),
+				idKey:           []byte(fakeID),
+				secretKey:       []byte(fakeSecret),
+				sessionTokenKey: []byte(fakeSessTok),
+			},
+			setupCache: func(c *cache.Cache) {
+				// Same keys but only the long-lived cache key populated (no session token).
+				c.Set(
+					tokenCacheKey(fakeRegion, fakeID, fakeSecret),
+					fakeToken,
+					cache.DefaultExpiration,
+				)
+			},
+			getAuthTokenFn: func(
+				_ context.Context,
+				_,
+				_,
+				_,
+				sess string,
+			) (string, time.Time, error) {
+				assert.Equal(t, fakeSessTok, sess)
+				return fakeToken, time.Now().Add(12 * time.Hour), nil
+			},
+			assertions: func(t *testing.T, c *cache.Cache, creds *credentials.Credentials, err error) {
+				assert.NoError(t, err)
+				assert.NotNil(t, creds)
+				_, hasSessKey := c.Items()[tokenCacheKey(fakeRegion, fakeID, fakeSecret, fakeSessTok)]
+				assert.True(t, hasSessKey)
+			},
+		},
+		{
 			name:     "cache miss, successful token fetch",
 			credType: credentials.TypeImage,
 			repoURL:  fakeRepoURL,
@@ -225,6 +310,7 @@ func TestAccessKeyProvider_GetCredentials(t *testing.T) {
 			},
 			getAuthTokenFn: func(
 				context.Context,
+				string,
 				string,
 				string,
 				string,
@@ -261,6 +347,7 @@ func TestAccessKeyProvider_GetCredentials(t *testing.T) {
 				string,
 				string,
 				string,
+				string,
 			) (string, time.Time, error) {
 				return "", time.Time{}, errors.New("auth token error")
 			},
@@ -280,6 +367,7 @@ func TestAccessKeyProvider_GetCredentials(t *testing.T) {
 			},
 			getAuthTokenFn: func(
 				context.Context,
+				string,
 				string,
 				string,
 				string,

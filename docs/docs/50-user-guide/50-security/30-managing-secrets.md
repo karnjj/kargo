@@ -556,6 +556,10 @@ stringData:
   repoURL: <ecr url>
 ```
 
+For **temporary credentials** (for example from AWS STS, assumed roles, or
+federation), add `awsSessionToken` to `stringData` with the session token
+returned alongside the access key ID and secret access key.
+
 :::note
 
 The `kargo create/update credentials` commands do not support creating or

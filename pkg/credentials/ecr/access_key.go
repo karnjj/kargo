@@ -17,9 +17,10 @@ import (
 )
 
 const (
-	regionKey = "awsRegion"
-	idKey     = "awsAccessKeyID"
-	secretKey = "awsSecretAccessKey"
+	regionKey       = "awsRegion"
+	idKey           = "awsAccessKeyID"
+	secretKey       = "awsSecretAccessKey"
+	sessionTokenKey = "awsSessionToken"
 )
 
 func init() {
@@ -41,6 +42,7 @@ type AccessKeyProvider struct {
 		region string,
 		accessKeyID string,
 		secretAccessKey string,
+		sessionToken string,
 	) (string, time.Time, error)
 }
 
@@ -81,7 +83,16 @@ func (p *AccessKeyProvider) GetCredentials(
 	region := string(req.Data[regionKey])
 	accessKeyID := string(req.Data[idKey])
 	secretAccessKey := string(req.Data[secretKey])
-	cacheKey := tokenCacheKey(region, accessKeyID, secretAccessKey)
+	sessionToken := ""
+	if v := req.Data[sessionTokenKey]; len(v) > 0 {
+		sessionToken = string(v)
+	}
+	var cacheKey string
+	if sessionToken != "" {
+		cacheKey = tokenCacheKey(region, accessKeyID, secretAccessKey, sessionToken)
+	} else {
+		cacheKey = tokenCacheKey(region, accessKeyID, secretAccessKey)
+	}
 
 	logger := logging.LoggerFromContext(ctx).WithValues(
 		"provider", "ecrAccessKey",
@@ -101,6 +112,7 @@ func (p *AccessKeyProvider) GetCredentials(
 		region,
 		accessKeyID,
 		secretAccessKey,
+		sessionToken,
 	)
 	if err != nil || encodedToken == "" {
 		if err != nil {
@@ -121,15 +133,21 @@ func (p *AccessKeyProvider) GetCredentials(
 	return decodeAuthToken(encodedToken)
 }
 
-// getAuthToken gets an ECR authorization token using the provided access key ID
-// and secret access key. It returns the encoded token, which is a base64 string
+// getAuthToken gets an ECR authorization token using the provided access key ID,
+// secret access key, and optional session token (required for STS temporary
+// credentials). It returns the encoded token, which is a base64 string
 // containing a username and password separated by a colon.
 func (p *AccessKeyProvider) getAuthToken(
-	ctx context.Context, region, accessKeyID, secretAccessKey string,
+	ctx context.Context,
+	region, accessKeyID, secretAccessKey, sessionToken string,
 ) (string, time.Time, error) {
 	svc := ecr.NewFromConfig(aws.Config{
-		Region:      region,
-		Credentials: awscreds.NewStaticCredentialsProvider(accessKeyID, secretAccessKey, ""),
+		Region: region,
+		Credentials: awscreds.NewStaticCredentialsProvider(
+			accessKeyID,
+			secretAccessKey,
+			sessionToken,
+		),
 	})
 
 	output, err := svc.GetAuthorizationToken(ctx, &ecr.GetAuthorizationTokenInput{})

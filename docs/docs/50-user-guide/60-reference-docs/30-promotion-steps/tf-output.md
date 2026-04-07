@@ -105,6 +105,8 @@ steps:
       value: ${{ secret('aws-creds').awsAccessKeyID }}
     - name: AWS_SECRET_ACCESS_KEY
       value: ${{ secret('aws-creds').awsSecretAccessKey }}
+    - name: AWS_SESSION_TOKEN
+      value: ${{ secret('aws-creds').awsSessionToken }}
 - uses: tf-output
   as: infra
   config:
@@ -116,6 +118,8 @@ steps:
       value: ${{ secret('aws-creds').awsAccessKeyID }}
     - name: AWS_SECRET_ACCESS_KEY
       value: ${{ secret('aws-creds').awsSecretAccessKey }}
+    - name: AWS_SESSION_TOKEN
+      value: ${{ secret('aws-creds').awsSessionToken }}
 # Commit and push state changes...
 ```
 
@@ -148,6 +152,8 @@ steps:
       value: ${{ secret('aws-creds').awsAccessKeyID }}
     - name: AWS_SECRET_ACCESS_KEY
       value: ${{ secret('aws-creds').awsSecretAccessKey }}
+    - name: AWS_SESSION_TOKEN
+      value: ${{ secret('aws-creds').awsSessionToken }}
 ```
 
 The output value can be referenced directly:
@@ -178,6 +184,8 @@ steps:
       value: ${{ secret('aws-creds').awsAccessKeyID }}
     - name: AWS_SECRET_ACCESS_KEY
       value: ${{ secret('aws-creds').awsSecretAccessKey }}
+    - name: AWS_SESSION_TOKEN
+      value: ${{ secret('aws-creds').awsSessionToken }}
 ```
 
 ### Including Sensitive Outputs
@@ -208,4 +216,6 @@ steps:
       value: ${{ secret('aws-creds').awsAccessKeyID }}
     - name: AWS_SECRET_ACCESS_KEY
       value: ${{ secret('aws-creds').awsSecretAccessKey }}
+    - name: AWS_SESSION_TOKEN
+      value: ${{ secret('aws-creds').awsSessionToken }}
 ```

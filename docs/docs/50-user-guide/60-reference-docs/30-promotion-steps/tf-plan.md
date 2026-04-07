@@ -89,6 +89,8 @@ steps:
       value: ${{ secret('aws-creds').awsAccessKeyID }}
     - name: AWS_SECRET_ACCESS_KEY
       value: ${{ secret('aws-creds').awsSecretAccessKey }}
+    - name: AWS_SESSION_TOKEN
+      value: ${{ secret('aws-creds').awsSessionToken }}
 ```
 
 ### Plan Output in Pull Request
@@ -128,6 +130,8 @@ steps:
       value: ${{ secret('aws-creds').awsAccessKeyID }}
     - name: AWS_SECRET_ACCESS_KEY
       value: ${{ secret('aws-creds').awsSecretAccessKey }}
+    - name: AWS_SESSION_TOKEN
+      value: ${{ secret('aws-creds').awsSessionToken }}
 - uses: git-commit
   config:
     path: ./src
@@ -174,6 +178,8 @@ steps:
       value: ${{ secret('aws-creds').awsAccessKeyID }}
     - name: AWS_SECRET_ACCESS_KEY
       value: ${{ secret('aws-creds').awsSecretAccessKey }}
+    - name: AWS_SESSION_TOKEN
+      value: ${{ secret('aws-creds').awsSessionToken }}
 - uses: tf-apply
   config:
     dir: ./src/opentofu/${{ ctx.stage }}
@@ -185,4 +191,6 @@ steps:
       value: ${{ secret('aws-creds').awsAccessKeyID }}
     - name: AWS_SECRET_ACCESS_KEY
       value: ${{ secret('aws-creds').awsSecretAccessKey }}
+    - name: AWS_SESSION_TOKEN
+      value: ${{ secret('aws-creds').awsSessionToken }}
 ```
